@@ -28,13 +28,15 @@ export { MIN_PASSWORD_LENGTH } from './server/password.js';
  * @param {{checkRate: Function, getClientIP: Function}} config.rateLimit
  * @param {boolean}  [config.requireName]      hard-fail registration without a name
  * @param {Function} [config.onSession]        add per-app session fields
+ * @param {number}   [config.sessionTimeoutMs] ceiling on the session DB enrich;
+ *                                             onSession must tolerate a null dbUser
  * @param {Function} [config.onSignIn]         extra work on a PROVIDER sign-in
  * @param {object}   [config.pages]            override NextAuth page routes
  */
 export function createAuth(config) {
   const {
     brand, models, dbConnect, clientPromise, rateLimit,
-    requireName = false, onSession, onSignIn, pages,
+    requireName = false, onSession, onSignIn, pages, sessionTimeoutMs,
   } = config;
 
   // Fail loudly at import time rather than at the first sign-in attempt.
@@ -65,7 +67,9 @@ export function createAuth(config) {
   };
 
   return {
-    authOptions: buildAuthOptions({ dbConnect, User: models.User, clientPromise, onSession, onSignIn, pages }),
+    authOptions: buildAuthOptions({
+      dbConnect, User: models.User, clientPromise, onSession, onSignIn, pages, sessionTimeoutMs,
+    }),
     login: createLoginHandler(ctx),
     register: createRegisterHandler(ctx),
     verifyEmail: createVerifyEmailHandler(ctx),
