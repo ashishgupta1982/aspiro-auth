@@ -1,0 +1,150 @@
+# @aspiro/auth
+
+Google + Apple + email/password sign-in for the Aspiro app suite. NextAuth v4,
+MongoDB adapter, **database sessions**.
+
+Extracted from ChessMaster on 2026-08-26 — the canonical copy at the time, and
+the only one passing all seven checks in the vault's `Indie-Dev/Auth` audit.
+
+## The one rule
+
+**All three providers ship in every app. There is no capability selection.**
+
+Apple *registers itself* only when `APPLE_SERVICES_ID`, `APPLE_TEAM_ID`,
+`APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` are all present, and stays dormant
+otherwise. So an app gets Apple by adding env vars — never by changing code.
+
+Why fixed rather than configurable: the dangerous parts of auth are the
+*interactions*, not the capabilities. The account-takeover path found in
+ChessMaster on 2026-08-26 existed because Google and email were both enabled and
+the rule binding them was never wired, and nothing in the code could reveal the
+absence. With the set fixed, those rules are unconditional — they cannot be
+forgotten in app number twelve.
+
+## Install
+
+```bash
+npm i github:ashishgupta1982/aspiro-auth
+```
+
+Then in `next.config.mjs` — the package ships plain ESM + JSX with no build step,
+so Next has to compile it:
+
+```js
+const nextConfig = {
+  transpilePackages: ['@aspiro/auth'],
+};
+```
+
+## Use
+
+One config file per app. This is the only auth code an app writes:
+
+```js
+// src/lib/auth.js
+import { createAuth } from '@aspiro/auth';
+import dbConnect from './mongodb';
+import clientPromise from './mongodb-adapter';
+import User from '../models/User';
+import { checkRate, getClientIP } from '../utils/rateLimiter';
+
+export const auth = createAuth({
+  brand: {
+    name: 'ChessMaster',
+    colour: '#0B7E62',                             // email HTML — clients can't read Tailwind
+    url: 'https://chess.aspiro-consulting.co.uk',  // link fallback when NEXTAUTH_URL is unset
+  },
+  models: { User },
+  dbConnect,
+  clientPromise,
+  rateLimit: { checkRate, getClientIP },
+
+  // Optional
+  requireName: false,
+  onSession: ({ session, dbUser }) => {
+    session.user.role = dbUser?.role ?? 'user';
+    session.user.isAdmin = dbUser?.isAdmin ?? false;
+    return session;
+  },
+});
+
+export const { authOptions } = auth;
+```
+
+### Routes
+
+In the pages router a static file takes precedence over the `[...nextauth]`
+catch-all — which is why the split works, and also why these six cannot collapse
+into one dispatcher. They are three-line re-exports that never change again:
+
+```js
+// src/pages/api/auth/login.js
+import { auth } from '../../../lib/auth';
+export default auth.login;
+```
+
+Same shape for `register`, `verify-email`, `forgot-password`, `reset-password`,
+`resend-verification`. And:
+
+```js
+// src/pages/api/auth/[...nextauth].js
+import NextAuth from 'next-auth';
+import { authOptions } from '../../../lib/auth';
+export { authOptions };
+export default NextAuth(authOptions);
+```
+
+### User model
+
+```js
+import { authFields } from '@aspiro/auth/model';
+
+const UserSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  name: String,
+  ...authFields,
+  // app-specific fields here
+});
+```
+
+### UI
+
+```jsx
+import { SignInDialog } from '@aspiro/auth/ui';
+
+<SignInDialog
+  open={open}
+  onOpenChange={setOpen}
+  title="Sign in to ChessMaster"
+  description="Track your games and get AI coaching."
+  appleEnabled={process.env.NEXT_PUBLIC_APPLE_ENABLED === 'true'}
+  onSignIn={handleSignIn}
+/>
+```
+
+The dialog sets its own typography inline and uses only neutral greys, so it
+looks identical in every app and cannot inherit a host app's Tailwind config.
+That is deliberate: classes like CookBook's `shadow-soft` exist in one repo's
+config and are simply not emitted in another — the styling would vanish with no
+error.
+
+## What the app still owns
+
+Not everything belongs here. Each app keeps its own:
+
+- `dbConnect` / `clientPromise` / `User` model
+- rate limiter (the package uses the app's `AUTH_API` bucket — 10 per 15 min per IP)
+- `authHelper.js` — `getAuthenticatedUser` / `getEffectiveUserId`
+- the `/verify-email` and `/reset-password` landing pages
+- Resend env vars: `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`
+
+## Not covered
+
+- **GolfSoc** — invite/placeholder-claim flow; the only real behavioural fork.
+- **VocabularyBuilder** — Teams SSO. `@microsoft/teams-js` is 5 MB and used by
+  one app; a shared dependency would cost every other app that for nothing.
+
+## Related
+
+Design, rationale and the audit checklist: the vault's
+`40-Areas/Indie-Dev/Dev-Foundations/Auth.md`.
