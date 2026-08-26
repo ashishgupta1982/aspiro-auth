@@ -127,6 +127,29 @@ const UserSchema = new mongoose.Schema({
 });
 ```
 
+### The two email landing pages
+
+The package generates the URLs these serve (`/reset-password?token=…` and
+`/verify-email?token=…`), so it supplies the pages too. An app that has the API
+routes but not the pages fails **silently** — the emailed link 404s, or gets
+swallowed by middleware, and nothing in the code says so. ChessMaster shipped
+exactly that.
+
+```jsx
+// src/pages/reset-password.js
+import { ResetPasswordPage } from '@aspiro/auth/ui';
+import { BRAND } from '../lib/brand';
+export default function ResetPassword() {
+  return <ResetPasswordPage accent={BRAND.colour} />;
+}
+```
+
+Same shape for `verify-email.js` with `VerifyEmailPage`.
+
+⚠️ **If the app has middleware, exclude both paths from its matcher.** They are
+reached by unauthenticated users arriving from an email, so an auth redirect will
+eat them before the page renders.
+
 ### UI
 
 ```jsx
@@ -155,7 +178,6 @@ Not everything belongs here. Each app keeps its own:
 - `dbConnect` / `clientPromise` / `User` model
 - rate limiter (the package uses the app's `AUTH_API` bucket — 10 per 15 min per IP)
 - `authHelper.js` — `getAuthenticatedUser` / `getEffectiveUserId`
-- the `/verify-email` and `/reset-password` landing pages
 - Resend env vars: `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`
 
 ## Not covered
