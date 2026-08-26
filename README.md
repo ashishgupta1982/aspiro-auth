@@ -27,7 +27,9 @@ forgotten in app number twelve.
 npm i github:ashishgupta1982/aspiro-auth
 ```
 
-Then in `next.config.mjs` — the package ships plain ESM + JSX with no build step,
+Then **two** config changes. Both are required; miss either and it fails quietly.
+
+**1. `next.config.mjs`** — the package ships plain ESM + JSX with no build step,
 so Next has to compile it:
 
 ```js
@@ -35,6 +37,24 @@ const nextConfig = {
   transpilePackages: ['@aspiro/auth'],
 };
 ```
+
+**2. `tailwind.config.mjs`** — Tailwind only generates classes it can SEE, and by
+default it never looks inside `node_modules`:
+
+```js
+content: [
+  './src/**/*.{js,jsx}',
+  './node_modules/@aspiro/auth/src/**/*.{js,jsx}',   // ← required
+],
+```
+
+⚠️ **Skip that second one and the dialog breaks in the most confusing way
+possible.** None of its utility classes are emitted, so it renders with no
+positioning, no background and no size — invisible. The button appears to do
+nothing. Nothing errors, nothing warns, and the DOM node is actually there.
+This cost a debugging session on ChessMaster on 2026-08-26.
+
+Restart the dev server after changing either file.
 
 ## Use
 

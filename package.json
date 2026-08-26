@@ -1,6 +1,6 @@
 {
   "name": "@aspiro/auth",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shared Google + Apple + email/password auth for the Aspiro app suite. NextAuth v4, MongoDB adapter, database sessions.",
   "type": "module",
   "license": "MIT",
