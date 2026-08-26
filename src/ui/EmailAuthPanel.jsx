@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Mail, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 // First-party email + password auth, as a self-contained panel.
 //
@@ -21,7 +21,7 @@ import { Loader2, Mail, ArrowLeft } from 'lucide-react';
 
 const MODES = { SIGNIN: 'signin', REGISTER: 'register', FORGOT: 'forgot' };
 
-export default function EmailAuthPanel({ onCancel }) {
+export default function EmailAuthPanel({ onCancel, accent = '#111827' }) {
   const [mode, setMode] = useState(MODES.SIGNIN);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -108,12 +108,6 @@ export default function EmailAuthPanel({ onCancel }) {
     }
   };
 
-  const heading = {
-    [MODES.SIGNIN]: 'Sign in with email',
-    [MODES.REGISTER]: 'Create an account',
-    [MODES.FORGOT]: 'Reset your password',
-  }[mode];
-
   const cta = {
     [MODES.SIGNIN]: 'Sign in',
     [MODES.REGISTER]: 'Create account',
@@ -122,14 +116,14 @@ export default function EmailAuthPanel({ onCancel }) {
 
   const field =
     'w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-gray-900 placeholder-gray-400 ' +
-    'focus:outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-400/40';
+    'focus:outline-none focus:border-[var(--auth-accent)] focus:ring-2 focus:ring-[var(--auth-accent)]/30';
 
+  // The accent is the app's brand colour (createAuth's brand.colour). ONE accent
+  // only — primary action, focus ring, and the single secondary link. Everything
+  // else stays neutral so the dialog still reads as the same component in every
+  // app rather than a differently-skinned one.
   return (
-    <div className="w-full text-left">
-      <div className="mb-3 flex items-center gap-2">
-        <Mail className="h-4 w-4 text-gray-500" strokeWidth={2} aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-gray-900">{heading}</h2>
-      </div>
+    <div className="w-full text-left" style={{ '--auth-accent': accent }}>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {mode === MODES.REGISTER && (
@@ -205,7 +199,7 @@ export default function EmailAuthPanel({ onCancel }) {
         <button
           type="submit"
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-70"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--auth-accent)] px-4 py-2.5 font-medium text-white shadow-sm transition-all hover:shadow-md hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 disabled:opacity-70"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.25} />}
           {busy ? 'Please wait…' : cta}
@@ -215,7 +209,7 @@ export default function EmailAuthPanel({ onCancel }) {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-gray-600">
         {mode === MODES.SIGNIN && (
           <>
-            <button type="button" onClick={() => switchMode(MODES.REGISTER)} className="font-semibold text-gray-700 underline underline-offset-4 hover:text-gray-900">
+            <button type="button" onClick={() => switchMode(MODES.REGISTER)} className="font-semibold text-[var(--auth-accent)] underline underline-offset-4 hover:brightness-110">
               Create an account
             </button>
             <button type="button" onClick={() => switchMode(MODES.FORGOT)} className="underline underline-offset-4 hover:text-gray-900">

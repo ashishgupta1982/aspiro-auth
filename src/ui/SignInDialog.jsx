@@ -58,6 +58,7 @@ export default function SignInDialog({
   description = 'Choose how you would like to sign in.',
   appleEnabled = false,
   isAuthenticating = false,
+  accent = '#111827',
   onSignIn,
 }) {
   // Email starts collapsed: one-tap providers are the common path, and a form
@@ -76,7 +77,7 @@ export default function SignInDialog({
         <DialogPrimitive.Overlay className="fixed inset-0 z-[110] bg-black/55 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           className="fixed left-[50%] top-[50%] z-[110] grid w-[calc(100%-1.5rem)] max-w-sm translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-md"
-          style={DIALOG_FONT}
+          style={{ ...DIALOG_FONT, '--auth-accent': accent }}
         >
         <div className="flex flex-col space-y-1.5 text-center">
           {/* The title needs the style repeated: DialogTitle carries its own
@@ -95,7 +96,7 @@ export default function SignInDialog({
             type="button"
             onClick={() => onSignIn('google', '/')}
             disabled={isAuthenticating}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3.5 font-medium text-gray-700 shadow-sm ring-1 ring-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:opacity-60"
           >
             <GoogleIcon />
             Continue with Google
@@ -106,7 +107,7 @@ export default function SignInDialog({
               type="button"
               onClick={() => onSignIn('apple', '/')}
               disabled={isAuthenticating}
-              className="flex w-full items-center justify-center gap-3 rounded-lg bg-black px-4 py-3 font-medium text-white transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-4 py-3.5 font-medium text-white shadow-sm transition-all hover:-translate-y-px hover:bg-gray-900 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:opacity-60"
             >
               <AppleIcon />
               Continue with Apple
@@ -123,30 +124,36 @@ export default function SignInDialog({
         {/* Email is deliberately NOT a third button. Google and Apple are one tap
             and are what most people will use; giving email the same visual weight
             implies they are equal choices and makes the dialog read as three
-            competing options. A quiet link under the separator offers it without
-            advertising it, and expands the form in place when taken. */}
-        {showEmail ? (
-          // No onCancel: the provider buttons stay visible directly above, so a
-          // "back to all options" link would point at something already on
-          // screen. The dialog's close button is the way out.
-          <EmailAuthPanel />
-        ) : (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setShowEmail(true)}
-              className="rounded text-sm font-medium text-gray-600 underline underline-offset-4 transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
-            >
-              Sign in with email
-            </button>
-          </div>
-        )}
+            competing options.
 
-        <p className="text-center text-xs leading-relaxed text-gray-600">
+            The label is rendered ONCE and never changes — it stays centred, in the
+            same size and weight, whether the form is open or closed, and the form
+            simply expands beneath it. It previously swapped for the panel's own
+            mode-dependent heading, so the text appeared to change on click. */}
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setShowEmail((v) => !v)}
+            aria-expanded={showEmail}
+            className="rounded text-sm font-medium text-gray-600 underline underline-offset-4 transition-colors hover:text-[var(--auth-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2"
+          >
+            Sign in with email
+          </button>
+        </div>
+
+        {/* No onCancel: the label above is the toggle, and the provider buttons
+            stay visible, so a "back to all options" link would point at something
+            already on screen. */}
+        {showEmail && <EmailAuthPanel accent={accent} />}
+
+        {/* Legal footnote: present, findable, and deliberately quiet. It sits last
+            with extra space above it so it reads as a footer to the dialog rather
+            than as another step in the flow. */}
+        <p className="mt-1 text-center text-[11px] leading-relaxed text-gray-400">
           By continuing you agree to our{' '}
-          <a href="/terms" className="underline underline-offset-2 hover:text-gray-900">Terms</a>
+          <a href="/terms" className="underline underline-offset-2 hover:text-gray-600">Terms</a>
           {' '}and{' '}
-          <a href="/privacy" className="underline underline-offset-2 hover:text-gray-900">Privacy Policy</a>.
+          <a href="/privacy" className="underline underline-offset-2 hover:text-gray-600">Privacy Policy</a>.
         </p>
 
           <DialogPrimitive.Close className="absolute right-3 top-3 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">

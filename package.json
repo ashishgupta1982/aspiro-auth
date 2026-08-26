@@ -1,6 +1,6 @@
 {
   "name": "@aspiro/auth",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Shared Google + Apple + email/password auth for the Aspiro app suite. NextAuth v4, MongoDB adapter, database sessions.",
   "type": "module",
   "license": "MIT",
@@ -18,7 +18,7 @@
     "bcryptjs": "^2.4.3 || ^3.0.0",
     "cookie": "^0.6.0 || ^1.0.0",
     "jsonwebtoken": "^9.0.0",
-    "mongodb": "^5.0.0 || ^6.0.0",
+    "mongodb": "^5.0.0",
     "next": ">=14",
     "next-auth": "^4.24.0",
     "react": ">=18",
@@ -32,5 +32,18 @@
     "lucide-react": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@next-auth/mongodb-adapter": "^1.1.3",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "bcryptjs": "^2.4.3",
+    "cookie": "^0.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.474.0",
+    "mongodb": "^5.9.2",
+    "next": "^15.0.0",
+    "next-auth": "^4.24.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
