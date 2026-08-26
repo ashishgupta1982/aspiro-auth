@@ -21,7 +21,7 @@ export { MIN_PASSWORD_LENGTH } from './server/password.js';
  * together are always wired.
  *
  * @param {object} config
- * @param {{name: string, colour: string, url: string}} config.brand
+ * @param {{name: string, colour: string, url: string, verifyNote?: string}} config.brand
  * @param {{User: object}} config.models
  * @param {Function} config.dbConnect          the app's mongoose connect helper
  * @param {Promise}  config.clientPromise      the app's raw Mongo client (adapter)
@@ -46,7 +46,14 @@ export function createAuth(config) {
     throw new Error('[aspiro-auth] config.rateLimit needs { checkRate, getClientIP }');
   }
 
-  configureBrand({ name: brand.name, colour: brand.colour, fallbackUrl: brand.url });
+  // `verifyNote` is optional and app-specific: one sentence appended to the
+  // verification email saying what the user does next in THIS app.
+  configureBrand({
+    name: brand.name,
+    colour: brand.colour,
+    fallbackUrl: brand.url,
+    verifyNote: brand.verifyNote || '',
+  });
 
   const ctx = {
     dbConnect,

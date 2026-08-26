@@ -73,6 +73,10 @@ export const auth = createAuth({
     name: 'ChessMaster',
     colour: '#0B7E62',                             // email HTML — clients can't read Tailwind
     url: 'https://chess.aspiro-consulting.co.uk',  // link fallback when NEXTAUTH_URL is unset
+    // Optional: one sentence appended to the VERIFICATION email, saying what
+    // this app wants the user to do next. Any copy specific to your app goes
+    // here — never inside the package's own templates.
+    verifyNote: 'Then link your chess.com username and we’ll start analysing your games.',
   },
   models: { User },
   dbConnect,

@@ -20,6 +20,12 @@ let BRAND = {
   name: 'App',
   colour: '#111827',
   fallbackUrl: '',
+  // Optional one-sentence nudge appended to the VERIFICATION email only, saying
+  // what the user gets to do next in this particular app. It exists because the
+  // extraction from ChessMaster carried its "link your chess.com username"
+  // sentence into the shared file, which CookBook would then have sent to its
+  // own users. App-specific copy has to be app-supplied or it leaks.
+  verifyNote: '',
 };
 
 export function configureBrand(next) {
@@ -102,6 +108,13 @@ async function safeSend({ to, subject, html, logLine }) {
   }
 }
 
+// The generic sentence, plus whatever this app wants to say about what happens
+// next. Keep the app's half in its BRAND, never here.
+function verificationBody() {
+  const base = 'Please confirm your email address to finish setting up your account.';
+  return BRAND.verifyNote ? `${base} ${BRAND.verifyNote}` : base;
+}
+
 export async function sendVerificationEmail({ to, name, verifyUrl }) {
   return safeSend({
     to,
@@ -109,7 +122,7 @@ export async function sendVerificationEmail({ to, name, verifyUrl }) {
     logLine: `[email] Verification link for ${to}: ${verifyUrl}`,
     html: layout({
       greeting: name ? `Hi ${name},` : 'Hi,',
-      body: 'Please confirm your email address to finish setting up your account. Then link your chess.com username and we’ll start analysing your games.',
+      body: verificationBody(),
       ctaLabel: 'Verify my email',
       ctaUrl: verifyUrl,
       footnote: "This link expires in 24 hours. If you didn't create an account, you can ignore this email.",
