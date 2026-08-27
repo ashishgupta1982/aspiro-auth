@@ -85,7 +85,12 @@ export const auth = createAuth({
 
   // Optional
   requireName: false,
-  onSession: ({ session, dbUser }) => {
+  // `dbUser` is null if there is no such document OR if the lookup failed —
+  // `enrichFailed` tells the two apart. A session enrich failure is never fatal:
+  // the session still resolves from the adapter's own user document. Only an
+  // onSession that PROVISIONS needs to care.
+  onSession: ({ session, dbUser, enrichFailed }) => {
+    if (enrichFailed) return session;
     session.user.role = dbUser?.role ?? 'user';
     session.user.isAdmin = dbUser?.isAdmin ?? false;
     return session;

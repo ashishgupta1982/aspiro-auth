@@ -40,7 +40,7 @@ function appleClientSecret() {
  * @param {object} ctx - { dbConnect, User, clientPromise, onSession, onSignIn, pages }
  */
 export function buildAuthOptions(ctx) {
-  const { dbConnect, User, clientPromise, onSession, onSignIn, pages, sessionTimeoutMs } = ctx;
+  const { dbConnect, User, clientPromise, onSession, onSignIn, pages } = ctx;
 
   // `allowDangerousEmailAccountLinking` lets a user who signs in with Apple land on
   // the SAME account as their Google login when the verified email matches — one
@@ -164,46 +164,37 @@ export function buildAuthOptions(ctx) {
 
         // Then enrich from the app's own User model.
         //
-        // `sessionTimeoutMs` puts a hard ceiling on that lookup. This callback
-        // runs on EVERY request, so a slow or stuck Mongo connection here does
-        // not fail one page — it freezes the whole app on a loading screen.
-        // MoneyHub hit exactly that and grew its own guard; it belongs here so
-        // the next app does not have to learn it the same way.
+        // A failure here must NOT be fatal. This callback runs on EVERY
+        // request, so throwing out of it doesn't break one page — it takes the
+        // whole app down over a field. On failure the adapter-seeded values
+        // above carry the session, and the next request tries again.
         //
-        // Opt-in, because the failure mode cuts both ways: on timeout `dbUser`
-        // is null, and an onSession that PROVISIONS a missing user (Tutor App
-        // does) would try to create one that already exists. Set it only when
-        // onSession is a pure read. `enrichFailed` lets onSession tell "no such
-        // user" apart from "the lookup did not finish".
+        // There is deliberately no timeout knob here. Bounding how long a
+        // broken connection hangs is `serverSelectionTimeoutMS` on the app's
+        // own Mongo client, which this package is handed after the fact and
+        // cannot configure. Measuring the problem in the wrong layer is not
+        // the same as fixing it.
         let dbUser = null;
         let enrichFailed = false;
 
-        const enrich = async () => {
+        try {
           await dbConnect();
           dbUser = await User.findOne({ email: user.email });
           if (dbUser?._id) session.user.id = dbUser._id.toString();
-        };
-
-        if (sessionTimeoutMs) {
-          try {
-            await Promise.race([
-              enrich(),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('session enrich timeout')), sessionTimeoutMs)
-              ),
-            ]);
-          } catch (error) {
-            enrichFailed = true;
-            console.error('[aspiro-auth] session enrich skipped:', error?.message || error);
-          }
-        } else {
-          await enrich();
+        } catch (error) {
+          enrichFailed = true;
+          console.error('[aspiro-auth] session enrich failed:', error?.message || error);
         }
 
         // Per-app session fields (role, isAdmin, and whatever else the client
         // reads). A field the UI reads but the callback never sets renders as
         // undefined — the UI quietly disappears rather than erroring, which is
         // how GolfSoc lost its whole super-admin surface.
+        //
+        // `enrichFailed` tells onSession that dbUser is null because the lookup
+        // BROKE, not because there is no such user. The difference matters to
+        // any onSession that provisions: creating an account on a failed read
+        // would be creating one that already exists.
         return onSession ? onSession({ session, user, dbUser, enrichFailed }) : session;
       },
     },
