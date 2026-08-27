@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Loader2 } from 'lucide-react';
 import EmailAuthPanel from './EmailAuthPanel.jsx';
 
 // Radix is used directly rather than through an app's local ui/dialog wrapper:
@@ -66,10 +67,46 @@ export default function SignInDialog({
   // the user has expressed any interest in typing a password.
   const [showEmail, setShowEmail] = useState(false);
 
-  // Reopening should look the way it did the first time, not resume mid-form.
+  // Which provider is mid-handoff, if any.
+  //
+  // signIn() is NOT a redirect. NextAuth fetches /api/auth/csrf, POSTs to
+  // /api/auth/signin/<provider>, reads the authorization URL out of the
+  // response, and only then moves the page — two round trips to our own server,
+  // which on a cold serverless function is comfortably over a second. Without
+  // this the dialog sits completely unchanged for that whole window and the
+  // button reads as broken.
+  //
+  // It lives here rather than in each app because this component owns the
+  // button and is the only thing that knows which one was pressed. Apps may
+  // still pass `isAuthenticating` to force the state; the two are OR-ed.
+  const [pending, setPending] = useState(null);
+  const busy = isAuthenticating || pending !== null;
+
+  // Reopening should look the way it did the first time, not resume mid-form —
+  // and a cancelled handoff must not leave a spinner running forever.
   useEffect(() => {
-    if (!open) setShowEmail(false);
+    if (!open) {
+      setShowEmail(false);
+      setPending(null);
+    }
   }, [open]);
+
+  // Warm the auth endpoint the moment the dialog opens.
+  //
+  // This is the first of the two round trips above, fetched before the user has
+  // finished deciding — so the click has one hop left instead of two, and the
+  // serverless function is already awake. Deliberately fire-and-forget: it is an
+  // optimisation, and a failure here must not surface as an error.
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/auth/csrf', { credentials: 'same-origin' }).catch(() => {});
+  }, [open]);
+
+  const start = (provider) => {
+    if (busy) return;
+    setPending(provider);
+    onSignIn(provider, '/');
+  };
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -94,23 +131,43 @@ export default function SignInDialog({
         <div className="space-y-2.5">
           <button
             type="button"
-            onClick={() => onSignIn('google', '/')}
-            disabled={isAuthenticating}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3.5 font-medium text-gray-700 shadow-sm ring-1 ring-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:opacity-60"
+            onClick={() => start('google')}
+            disabled={busy}
+            aria-busy={pending === 'google'}
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3.5 font-medium text-gray-700 shadow-sm ring-1 ring-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
           >
-            <GoogleIcon />
-            Continue with Google
+            {pending === 'google' ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin text-gray-500" strokeWidth={2.25} />
+                Taking you to Google&hellip;
+              </>
+            ) : (
+              <>
+                <GoogleIcon />
+                Continue with Google
+              </>
+            )}
           </button>
 
           {appleEnabled && (
             <button
               type="button"
-              onClick={() => onSignIn('apple', '/')}
-              disabled={isAuthenticating}
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-4 py-3.5 font-medium text-white shadow-sm transition-all hover:-translate-y-px hover:bg-gray-900 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:opacity-60"
+              onClick={() => start('apple')}
+              disabled={busy}
+              aria-busy={pending === 'apple'}
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-black px-4 py-3.5 font-medium text-white shadow-sm transition-all hover:-translate-y-px hover:bg-gray-900 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-black"
             >
-              <AppleIcon />
-              Continue with Apple
+              {pending === 'apple' ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin text-white/70" strokeWidth={2.25} />
+                  Taking you to Apple&hellip;
+                </>
+              ) : (
+                <>
+                  <AppleIcon />
+                  Continue with Apple
+                </>
+              )}
             </button>
           )}
         </div>
@@ -135,7 +192,8 @@ export default function SignInDialog({
             type="button"
             onClick={() => setShowEmail((v) => !v)}
             aria-expanded={showEmail}
-            className="rounded text-sm font-medium text-gray-600 underline underline-offset-4 transition-colors hover:text-[var(--auth-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2"
+            disabled={busy}
+            className="rounded text-sm font-medium text-gray-600 underline underline-offset-4 transition-colors hover:text-[var(--auth-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:text-gray-600"
           >
             Sign in with email
           </button>
