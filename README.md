@@ -187,6 +187,101 @@ That is deliberate: classes like CookBook's `shadow-soft` exist in one repo's
 config and are simply not emitted in another — the styling would vanish with no
 error.
 
+## Migrating an existing app
+
+Six apps have been through this. The steps are mechanical; the traps below are
+not, and every one of them fails **silently**.
+
+### The eleven traps
+
+1. **Tailwind must scan the package.** Add
+   `'./node_modules/@aspiro/auth/src/**/*.{js,jsx}'` to `content`. Without it
+   none of the dialog's classes are generated, so it renders unpositioned and
+   invisible — the button appears to do nothing, and nothing errors.
+2. **`transpilePackages: ['@aspiro/auth']`** in `next.config.mjs`, since this
+   package ships raw JSX rather than a build output.
+3. **`next lint` does not resolve imports.** Two ChessMaster deploys failed on a
+   missing `bcryptjs` while lint passed clean. Every one of the last four
+   migrations was missing at least one peer. Resolve every bare import before
+   pushing, and confirm the deployment actually reached READY.
+4. **Exclude `/reset-password` and `/verify-email` from any auth gate.** They are
+   opened by people with no session, arriving from an email. A gate eats the link
+   and bounces it to `/signin`.
+5. **`/signin` cannot be deleted**, however obsolete it looks once the landing
+   page has its own modal. `pages: { signIn, error }` points at it, as do the
+   middleware, `/admin`'s guard and `_app`'s bare-pages list. Rebuild it around
+   the shared dialog instead — and have it surface `?error=`, which nothing read
+   before, so failed provider sign-ins looked like a silent no-op.
+6. **Keep the brand in its own file.** `brand.js` with **no imports**, shared by
+   the server (emails) and the client (dialog accent). Importing it from
+   `auth.js` drags mongoose, the Mongo adapter and bcrypt into the browser
+   bundle.
+7. **Don't use `file:` linking for local work.** It needs devDependencies in the
+   package *and* `resolve.symlinks = false` in the app, and gives
+   two-copies-of-React errors when either is missing. Tag and bump instead.
+8. **The second app audits the first.** Extraction silently promotes
+   app-specific things into shared ones and nothing reveals it until someone
+   else uses them. This package's verification email shipped with "Then link
+   your chess.com username and we'll start analysing your games" — extracted
+   verbatim from ChessMaster, and about to go to CookBook's users. After
+   extracting anything, read **every user-facing string** and ask: would app two
+   say this? What fails goes back to the app as config (`brand.verifyNote`).
+9. **A session callback that provisions cannot move to `onSignIn`.**
+   `events.signIn` fires only for **provider** sign-ins, so a user arriving via
+   the password, verification or reset routes would never be provisioned and
+   would land on a broken page. Put it in `onSession`, which runs on every
+   session read however the session was minted. Note the ordering: the package
+   sets `session.user.id` from the adapter user *before* `onSession` runs, so a
+   callback that creates the document must set it again.
+10. **Every app has a different way of eating the emailed links.** Don't look for
+    middleware — look for *whatever this app does to a signed-out visitor*:
+
+    | App | What would have eaten the link |
+    |---|---|
+    | ChessMaster, RunCoach | `middleware.js` matcher |
+    | MoneyHub | `_app.js` redirect sending every signed-out visitor to `/signin` |
+    | CookBook, DoIt, Tutor App | a `noLayoutPages` / bare-pages list (cosmetic, but still needed) |
+
+11. **One app's local fix is not evidence the package needs it.** MoneyHub had a
+    3s ceiling on its session DB lookup, from a real incident. Promoting it here
+    was wrong twice over: it was the *least* important of that incident's three
+    fixes (the real ones were seeding the session from the adapter user, and
+    `serverSelectionTimeoutMS` on the Mongo client), and this package **cannot**
+    set `serverSelectionTimeoutMS` — the app builds its own client and hands the
+    finished promise over. A stopwatch in here measured a problem it had no
+    ability to prevent.
+
+    > The test: **would this be in the package if the app I found it in didn't
+    > exist?** If no, it is that app's fix, not the suite's.
+
+### Prerequisites most apps were missing
+
+- **A rate limiter exporting `getClientIP`.** Three of six had the function but
+  never exported it. None had an `AUTH_API` bucket (10 attempts / 15 min / IP).
+  Add both to the app's existing limiter rather than replacing the file — other
+  routes depend on its other buckets.
+- **`authFields` spread into the `User` model** — from `@aspiro/auth/model`.
+- **`RESEND_API_KEY` + `EMAIL_FROM` set in Vercel.** Missing env vars are the
+  single most common reason "email isn't sending"; the routes log the link to the
+  server console instead and carry on, so nothing errors.
+
+### As built, per app
+
+| App | What wasn't standard |
+|---|---|
+| ChessMaster | First migration. `/signin` was load-bearing in five places (trap 5). |
+| CookBook | The original template these files came from. `requireName: true` — recipes are shared and followed, so an account with no name has nothing to put on a card. |
+| Tutor App | Its session callback **provisioned** — created the User doc, backfilled seven fields, auto-created a default student (trap 9). Returns early on `enrichFailed`. Its student claim flow re-points `accounts`/`sessions` directly and is untouched by the migration. |
+| RunCoach | Carried an Azure AD provider no UI ever offered, since deleted. Keeps a throttled `lastLoginAt` refresh in `onSession`, because `events.signIn` never fires for a returning user with a live session. |
+| DoIt | Nothing — the cleanest of the six. |
+| MoneyHub | Trap 11. Keeps `serverSelectionTimeoutMS: 8000` in its own Mongo config, where it belongs. |
+
+Out of scope: **GolfSoc** (uses `CredentialsProvider` and a placeholder-claim
+flow this package deliberately doesn't cover), **VocabularyBuilder** (stays
+forked for its Teams build), **GamePad** (deferred), **Aspiro Homepage** (auth
+deleted outright — it was a static brochure site carrying NextAuth, Mongo and a
+Teams SSO endpoint for a settings page that showed you your own email address).
+
 ## What the app still owns
 
 Not everything belongs here. Each app keeps its own:
