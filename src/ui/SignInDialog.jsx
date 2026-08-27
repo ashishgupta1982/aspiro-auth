@@ -139,7 +139,7 @@ export default function SignInDialog({
             {pending === 'google' ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin text-gray-500" strokeWidth={2.25} />
-                Taking you to Google&hellip;
+                Signing in with Google&hellip;
               </>
             ) : (
               <>
@@ -160,7 +160,7 @@ export default function SignInDialog({
               {pending === 'apple' ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin text-white/70" strokeWidth={2.25} />
-                  Taking you to Apple&hellip;
+                  Signing in with Apple&hellip;
                 </>
               ) : (
                 <>

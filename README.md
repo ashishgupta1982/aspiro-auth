@@ -154,7 +154,7 @@ export default function ResetPassword() {
 ```
 
 The dialog handles its own in-flight state: clicking a provider swaps that
-button for a spinner and "Taking you to Google…", disables the rest, and warms
+button for a spinner and "Signing in with Google…", disables the rest, and warms
 `/api/auth/csrf` when it opens. `signIn()` is not a redirect — NextAuth makes
 two round trips to your own server before the page moves — so without this the
 button looks broken for a second or more. Apps need pass nothing; the optional
