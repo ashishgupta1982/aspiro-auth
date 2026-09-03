@@ -187,6 +187,36 @@ That is deliberate: classes like CookBook's `shadow-soft` exist in one repo's
 config and are simply not emitted in another — the styling would vanish with no
 error.
 
+### Session splash gate
+
+```jsx
+import SessionSplashGate from '@aspiro/auth/splash';
+
+// In _app, inside SessionProvider. Render the DESTINATION underneath it —
+// unauthenticated → the sign-in landing in place (no redirect hop),
+// authenticated → the app shell.
+<SessionSplashGate
+  active={isAppRoute}
+  appName="CookBook"                 // or wordmark={<Wordmark />} for a custom node
+  iconSrc="/icon-192.png"
+  groundClassName="bg-slate-950"     // the brand's dark ground
+/>
+```
+
+A full-screen branded overlay held while `useSession()` resolves: it stays up
+until the status leaves `'loading'` AND a 600ms minimum has passed (so a fast
+answer doesn't flash the splash itself), then fades out over 300ms and
+unmounts. Mount it unconditionally in `_app` and drive visibility with
+`active` — its timers run from mount, so a visitor who lands on `/signin` and
+navigates in later never sees a stale splash. Exported from `./splash` on its
+own so an app can use the gate without installing the dialog's optional peers
+(Radix, lucide). The host app's Tailwind must scan this package's source (trap
+1 below), same as every other component here.
+
+While the session is checking, pass that state to the sign-in landing (e.g. a
+`checking` prop that disables its CTA and shows a spinner) so the page under
+the splash isn't inviting a click that would do nothing.
+
 ## Migrating an existing app
 
 Six apps have been through this. The steps are mechanical; the traps below are

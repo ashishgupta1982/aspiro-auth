@@ -1,6 +1,6 @@
 {
   "name": "@aspiro/auth",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Shared Google + Apple + email/password auth for the Aspiro app suite. NextAuth v4, MongoDB adapter, database sessions.",
   "type": "module",
   "license": "MIT",
@@ -11,6 +11,7 @@
   "exports": {
     ".": "./src/index.js",
     "./ui": "./src/ui/index.js",
+    "./splash": "./src/ui/SessionSplashGate.jsx",
     "./model": "./src/model/authFields.js"
   },
   "peerDependencies": {
