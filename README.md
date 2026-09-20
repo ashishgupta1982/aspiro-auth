@@ -330,4 +330,6 @@ Not everything belongs here. Each app keeps its own:
 ## Related
 
 Design, rationale and the audit checklist: the vault's
-`40-Areas/Indie-Dev/Dev-Foundations/Auth.md`.
+`40-Areas/Indie-Dev/10-Foundations/Foundations-Authentication.md`.
+
+Working *on* this package rather than calling it: `CLAUDE.md`.
