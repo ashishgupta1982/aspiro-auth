@@ -6,6 +6,9 @@ import { createVerifyEmailHandler } from './server/routes/verify-email.js';
 import { createForgotPasswordHandler } from './server/routes/forgot-password.js';
 import { createResetPasswordHandler } from './server/routes/reset-password.js';
 import { createResendVerificationHandler } from './server/routes/resend-verification.js';
+import {
+  assertScheme, createNativeStartHandler, createNativeFinishHandler, createNativeRedeemHandler,
+} from './server/native.js';
 
 export { authFields } from './model/authFields.js';
 export { createDbSession, sessionCookieName } from './server/session.js';
@@ -30,11 +33,13 @@ export { MIN_PASSWORD_LENGTH } from './server/password.js';
  * @param {Function} [config.onSession]        add per-app session fields
  * @param {Function} [config.onSignIn]         extra work on a PROVIDER sign-in
  * @param {object}   [config.pages]            override NextAuth page routes
+ * @param {{scheme: string}} [config.native]   the iOS shell's URL scheme (the bundle
+ *   id): turns on Google and Apple sign-in inside the shell (server/native.js)
  */
 export function createAuth(config) {
   const {
     brand, models, dbConnect, clientPromise, rateLimit,
-    requireName = false, onSession, onSignIn, pages,
+    requireName = false, onSession, onSignIn, pages, native,
   } = config;
 
   // Fail loudly at import time rather than at the first sign-in attempt.
@@ -45,6 +50,7 @@ export function createAuth(config) {
   if (!rateLimit?.checkRate || !rateLimit?.getClientIP) {
     throw new Error('[aspiro-auth] config.rateLimit needs { checkRate, getClientIP }');
   }
+  if (native) assertScheme(native.scheme);
 
   // `verifyNote` is optional and app-specific: one sentence appended to the
   // verification email saying what the user does next in THIS app.
@@ -72,5 +78,21 @@ export function createAuth(config) {
     forgotPassword: createForgotPasswordHandler(ctx),
     resetPassword: createResetPasswordHandler(ctx),
     resendVerification: createResendVerificationHandler(ctx),
+
+    // The iOS shell's sign-in hand-over. Without `native` there is no shell to
+    // hand over to, so the routes answer 404 rather than half-work.
+    nativeStart: native
+      ? createNativeStartHandler({ brandName: brand.name })
+      : notConfigured,
+    nativeFinish: native
+      ? createNativeFinishHandler({ clientPromise, scheme: native.scheme })
+      : notConfigured,
+    nativeRedeem: native
+      ? createNativeRedeemHandler({ clientPromise, checkRate: rateLimit.checkRate, getClientIP: rateLimit.getClientIP })
+      : notConfigured,
   };
+}
+
+function notConfigured(req, res) {
+  return res.status(404).json({ error: 'Not found' });
 }

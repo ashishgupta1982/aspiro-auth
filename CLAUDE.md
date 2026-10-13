@@ -79,8 +79,10 @@ src/
 │   ├── password.js          hashing + verification
 │   ├── verificationToken.js single-use tokens
 │   ├── email.js             Resend delivery
+│   ├── native.js            the iOS shell's sign-in hand-over (start, finish, redeem)
 │   └── routes/              the six credential routes
-└── ui/                      SignInDialog, the two landing pages, the splash gate
+└── ui/                      SignInDialog, the two landing pages, the splash gate,
+                             nativeSignIn (the webview half of native.js)
 ```
 
 **Four entry points:** `@aspiro/auth`, `/ui`, `/splash`, `/model`. The splash
@@ -105,6 +107,10 @@ peers — that is why GolfSoc can take the gate without taking the dialog.
 - **The app keeps its own `dbConnect`, `User` model, rate limiter and
   `authHelper.js`.** Pulling those in here would make the package need to know
   each app's data layer.
+
+- **The iOS hand-over code alone must never be enough.** A custom URL scheme
+  can be registered by any app, so `redeem` requires the verifier whose hash
+  went out with `start`. Don't drop that check to simplify the client.
 
 ## Deliberate exceptions — don't "align" them
 

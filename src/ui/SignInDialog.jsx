@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Loader2 } from 'lucide-react';
 import EmailAuthPanel from './EmailAuthPanel.jsx';
+import { isNativeShell, nativeSignIn } from './nativeSignIn.js';
 
 // Radix is used directly rather than through an app's local ui/dialog wrapper:
 // those wrappers carry app-specific Tailwind (CookBook's shadow-soft-xl and
@@ -82,12 +83,17 @@ export default function SignInDialog({
   const [pending, setPending] = useState(null);
   const busy = isAuthenticating || pending !== null;
 
+  // Only the iOS shell sets this: a hand-over that failed rather than one the
+  // person cancelled. On the web a failed sign-in lands on the error page.
+  const [nativeError, setNativeError] = useState(null);
+
   // Reopening should look the way it did the first time, not resume mid-form —
   // and a cancelled handoff must not leave a spinner running forever.
   useEffect(() => {
     if (!open) {
       setShowEmail(false);
       setPending(null);
+      setNativeError(null);
     }
   }, [open]);
 
@@ -105,6 +111,18 @@ export default function SignInDialog({
   const start = (provider) => {
     if (busy) return;
     setPending(provider);
+    setNativeError(null);
+
+    // Inside an app's iOS shell the provider flow cannot run in the webview
+    // (Google refuses embedded webviews), so it runs in the in-app browser and
+    // the session is handed back (nativeSignIn.js). On the web, nothing changes.
+    if (isNativeShell()) {
+      nativeSignIn(provider, { callbackUrl: '/' }).catch((error) => {
+        setPending(null);
+        if (error?.message !== 'cancelled') setNativeError('Sign-in did not complete. Please try again.');
+      });
+      return;
+    }
     onSignIn(provider, '/');
   };
 
@@ -171,6 +189,10 @@ export default function SignInDialog({
             </button>
           )}
         </div>
+
+        {nativeError && (
+          <p role="alert" className="text-center text-sm text-red-700">{nativeError}</p>
+        )}
 
         <div className="flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-gray-200" />

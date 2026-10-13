@@ -217,6 +217,32 @@ While the session is checking, pass that state to the sign-in landing (e.g. a
 `checking` prop that disables its CTA and shows a spinner) so the page under
 the splash isn't inviting a click that would do nothing.
 
+### Inside an iOS app (Capacitor shell)
+
+An app wrapped in a Capacitor shell that loads its live site needs Google and
+Apple sign-in to run in the in-app browser and hand the session back
+(`server/native.js` has the mechanism). Four steps:
+
+```js
+// src/lib/auth.js: add to createAuth({...})
+native: { scheme: 'com.aspiroconsulting.<app>' },   // the bundle id
+```
+
+```js
+// src/pages/api/auth/native/start.js   (and finish.js, redeem.js the same way)
+import { auth } from '../../../../lib/auth';
+export default auth.nativeStart;                      // nativeFinish, nativeRedeem
+```
+
+- The shell needs `@capacitor/browser` and `@capacitor/app`, then `npx cap sync`.
+- Register the scheme in `ios/App/App/Info.plist` (`CFBundleURLTypes`).
+
+`SignInDialog` switches by itself when it finds `window.Capacitor`; nothing else
+in the app changes. An app with its own provider buttons calls `nativeSignIn`
+from `@aspiro/auth/ui` when `isNativeShell()` is true. Without `native` the three
+routes answer 404. Hand-over codes live in the `nativehandoffs` collection
+(hash only, two-minute TTL).
+
 ## Migrating an existing app
 
 Six apps have been through this. The steps are mechanical; the traps below are
