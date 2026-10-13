@@ -243,6 +243,12 @@ from `@aspiro/auth/ui` when `isNativeShell()` is true. Without `native` the thre
 routes answer 404. Hand-over codes live in the `nativehandoffs` collection
 (hash only, two-minute TTL).
 
+Apple returns to the site with a cross-site POST, so in production the package
+sends NextAuth's `callback-url` cookie (with state, PKCE and nonce) as
+`SameSite=None`. Without it Apple lands on the home page inside the in-app
+browser and the app never signs in; the website looks fine either way. Apple
+can only be tested on the live site.
+
 ## Migrating an existing app
 
 Six apps have been through this. The steps are mechanical; the traps below are

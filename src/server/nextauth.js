@@ -77,9 +77,13 @@ export function buildAuthOptions(ctx) {
   }
 
   // Apple returns its callback as a CROSS-SITE POST (response_mode=form_post from
-  // appleid.apple.com). The default SameSite=Lax state/PKCE/nonce cookies aren't sent
-  // on that request, so NextAuth fails with `OAuthCallback`. On HTTPS we relax just
-  // those three to SameSite=None; Secure. Google (top-level GET) + local dev unaffected.
+  // appleid.apple.com). The default SameSite=Lax cookies aren't sent on that request.
+  // Without state/PKCE/nonce NextAuth fails with `OAuthCallback`. Without callback-url
+  // it quietly falls back to the home page: harmless on the web, but inside the iOS
+  // app the in-app browser then stops on the site instead of reaching
+  // /api/auth/native/finish, and the app never signs in (server/native.js). On HTTPS we
+  // relax just those four to SameSite=None; Secure. Google (top-level GET) + local dev
+  // unaffected.
   const useSecureCookies = process.env.NODE_ENV === 'production';
   const crossSiteOptions = { httpOnly: true, sameSite: 'none', path: '/', secure: true };
   const appleFriendlyCookies = useSecureCookies
@@ -87,6 +91,7 @@ export function buildAuthOptions(ctx) {
         state: { name: '__Secure-next-auth.state', options: crossSiteOptions },
         pkceCodeVerifier: { name: '__Secure-next-auth.pkce.code_verifier', options: crossSiteOptions },
         nonce: { name: '__Secure-next-auth.nonce', options: crossSiteOptions },
+        callbackUrl: { name: '__Secure-next-auth.callback-url', options: crossSiteOptions },
       }
     : undefined;
 
