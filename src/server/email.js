@@ -98,9 +98,11 @@ async function deliver({ to, subject, html }) {
 
 async function safeSend({ to, subject, html, logLine }) {
   try {
-    // Always surface the link in logs so a machine with no provider configured
-    // can still complete the flow.
-    if (logLine) console.log(logLine);
+    // Surface the link ONLY when there is no provider (local dev), so the flow can
+    // still be completed by pasting it. Never in production: a logged reset link
+    // is a working account takeover for anyone who can read the host's logs, and
+    // it undoes storing the token hashed. Found in the 2026-11-06 sweep.
+    if (logLine && !process.env.RESEND_API_KEY) console.log(logLine);
     return await deliver({ to, subject, html });
   } catch (error) {
     console.error('[email] Send failed:', error?.message || error);
