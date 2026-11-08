@@ -77,14 +77,17 @@ export const auth = createAuth({
     // this app wants the user to do next. Any copy specific to your app goes
     // here — never inside the package's own templates.
     verifyNote: 'Then link your chess.com username and we’ll start analysing your games.',
-    // Emails use the branded layout from 0.9.3: a band in `colour` with the
-    // icon and name, a full-width button, the long link in a small strip.
+    // Emails are a plain letter from 0.9.5: the icon and name at the top, a
+    // title, the message, one button in `colour`, the long link and the footer
+    // in small grey. The icon is ATTACHED to the email (an inline `cid:` image
+    // via Resend), so Mail shows it without "Load content"; if Resend refuses
+    // the attachment the email goes again with a linked icon.
     // All optional: `logo` (an ABSOLUTE icon URL; left out, the package looks
     // for /apple-touch-icon.png then /icon-192.png on the app's site, and
-    // leaves the icon out if neither is there), `colour2` (makes the band a
-    // gradient), `plainEmail: true` (the layout from before 0.9.3).
+    // leaves the icon out if neither is there), `plainEmail: true` (the layout
+    // from before 0.9.3). `colour2` (the 0.9.3-0.9.4 band gradient) is still
+    // accepted and now unused.
     logo: 'https://chess.aspiro-consulting.co.uk/icon-192.png',
-    colour2: '#07819F',
   },
   models: { User },
   dbConnect,
