@@ -24,7 +24,10 @@ export { MIN_PASSWORD_LENGTH } from './server/password.js';
  * together are always wired.
  *
  * @param {object} config
- * @param {{name: string, colour: string, url: string, verifyNote?: string}} config.brand
+ * @param {{name: string, colour: string, url: string, verifyNote?: string, logo?: string, colour2?: string}} config.brand
+ *   Emails use the branded layout (server/email.js): `logo` is an absolute icon
+ *   URL, found on the app's site when left out and simply omitted when none is
+ *   found; `colour2` makes the band a gradient; `plainEmail` keeps the old layout.
  * @param {{User: object}} config.models
  * @param {Function} config.dbConnect          the app's mongoose connect helper
  * @param {Promise}  config.clientPromise      the app's raw Mongo client (adapter)
@@ -59,6 +62,9 @@ export function createAuth(config) {
     colour: brand.colour,
     fallbackUrl: brand.url,
     verifyNote: brand.verifyNote || '',
+    logo: brand.logo || '',
+    colour2: brand.colour2 || '',
+    plainEmail: !!brand.plainEmail,
   });
 
   const ctx = {

@@ -77,6 +77,14 @@ export const auth = createAuth({
     // this app wants the user to do next. Any copy specific to your app goes
     // here — never inside the package's own templates.
     verifyNote: 'Then link your chess.com username and we’ll start analysing your games.',
+    // Emails use the branded layout from 0.9.3: a band in `colour` with the
+    // icon and name, a full-width button, the long link in a small strip.
+    // All optional: `logo` (an ABSOLUTE icon URL; left out, the package looks
+    // for /apple-touch-icon.png then /icon-192.png on the app's site, and
+    // leaves the icon out if neither is there), `colour2` (makes the band a
+    // gradient), `plainEmail: true` (the layout from before 0.9.3).
+    logo: 'https://chess.aspiro-consulting.co.uk/icon-192.png',
+    colour2: '#07819F',
   },
   models: { User },
   dbConnect,
@@ -178,8 +186,16 @@ import { SignInDialog } from '@aspiro/auth/ui';
   description="Track your games and get AI coaching."
   appleEnabled={process.env.NEXT_PUBLIC_APPLE_ENABLED === 'true'}
   onSignIn={handleSignIn}
+  // Optional (0.9.3):
+  layout="dialog"         // the old centred box; the default is "sheet"
+  icon="/my-icon.png"     // or false; left out, it finds the app's own icon
 />
 ```
+
+From 0.9.3 the dialog is a sheet up from the bottom on phones, with the app's
+icon above the title and email as a third button. It needs nothing from the
+app: the icon is looked for at /apple-touch-icon.png then /icon-192.png and is
+simply left out if neither loads.
 
 The dialog sets its own typography inline and uses only neutral greys, so it
 looks identical in every app and cannot inherit a host app's Tailwind config.

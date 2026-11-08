@@ -53,6 +53,63 @@ const AppleIcon = () => (
   </svg>
 );
 
+const CloseIcon = () => (
+  <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+
+const MailIcon = () => (
+  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+  </svg>
+);
+
+// The sheet's slide-up. The package cannot add to an app's CSS, and not every
+// app has tailwindcss-animate, so it carries its own keyframes. Phones only:
+// from `sm` up the sheet is the centred dialog.
+const SHEET_CSS = `
+@keyframes aspiro-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@media (max-width: 639px) { .aspiro-sheet[data-state='open'] { animation: aspiro-sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1); } }
+@media (prefers-reduced-motion: reduce) { .aspiro-sheet[data-state='open'] { animation: none; } }
+`;
+
+// The sheet (0.9.3, the default): on a phone the dialog is a sheet up from the
+// bottom with the buttons under the thumb, the app's icon sits above the title,
+// the close button is a proper 40px target, and email is a third full-width
+// button reading "Continue with email" so it is plainly a way to make an
+// account too. From `sm` up it is a centred dialog. `layout="dialog"` keeps the
+// look from before 0.9.3.
+//
+// The icon finds itself: an app passes nothing and gets its own icon from the
+// usual places (ICON_GUESSES), and if neither exists the icon is left out.
+// `icon` names one instead; `icon={false}` turns it off.
+const ICON_GUESSES = ['/apple-touch-icon.png', '/icon-192.png'];
+
+function AppIcon({ icon, accent }) {
+  const list = icon ? [icon] : ICON_GUESSES;
+  const [at, setAt] = useState(0);
+  if (icon === false || at >= list.length) return null;
+  return (
+    <span
+      className="mb-1.5 grid h-[84px] w-[84px] place-items-center rounded-[26px]"
+      style={{ background: `radial-gradient(circle, ${accent}29, ${accent}00 70%)` }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={list[at]}
+        alt=""
+        width={64}
+        height={64}
+        onError={() => setAt((n) => n + 1)}
+        className="h-16 w-16 rounded-2xl"
+        style={{ boxShadow: `0 8px 20px -8px ${accent}99` }}
+      />
+    </span>
+  );
+}
 export default function SignInDialog({
   open,
   onOpenChange,
@@ -62,7 +119,10 @@ export default function SignInDialog({
   isAuthenticating = false,
   accent = '#111827',
   onSignIn,
+  layout = 'sheet',
+  icon,
 }) {
+  const sheet = layout === 'sheet';
   // Email starts collapsed: one-tap providers are the common path, and a form
   // unfurled by default makes the dialog tall enough to scroll on a phone before
   // the user has expressed any interest in typing a password.
@@ -131,17 +191,27 @@ export default function SignInDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[110] bg-black/55 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[110] grid w-[calc(100%-1.5rem)] max-w-sm translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-md"
+          className={
+            sheet
+              ? 'aspiro-sheet fixed inset-x-0 bottom-0 z-[110] grid max-h-[92svh] gap-4 overflow-y-auto rounded-t-[26px] bg-white px-[22px] pb-[calc(1.75rem+env(safe-area-inset-bottom))] pt-2.5 shadow-2xl sm:inset-x-auto sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:w-full sm:max-w-md sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:border-gray-200 sm:p-6'
+              : 'fixed left-[50%] top-[50%] z-[110] grid w-[calc(100%-1.5rem)] max-w-sm translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-md'
+          }
           style={{ ...DIALOG_FONT, '--auth-accent': accent }}
         >
-        <div className="flex flex-col space-y-1.5 text-center">
+        {sheet && <style>{SHEET_CSS}</style>}
+        {sheet && <span aria-hidden="true" className="mx-auto block h-[5px] w-10 rounded-full bg-gray-300 sm:hidden" />}
+        <div className={`flex flex-col text-center ${sheet ? 'items-center space-y-1.5 pt-2' : 'space-y-1.5'}`}>
+          {sheet && <AppIcon icon={icon} accent={accent} />}
           {/* The title needs the style repeated: DialogTitle carries its own
               font-family via `font-display`, and inheritance from the parent
               cannot override a rule set on the element itself. */}
-          <DialogPrimitive.Title className="text-xl font-semibold tracking-normal text-gray-900" style={DIALOG_FONT}>
+          <DialogPrimitive.Title
+            className={`${sheet ? 'text-[25px]' : 'text-xl'} font-semibold tracking-normal text-gray-900`}
+            style={DIALOG_FONT}
+          >
             {title}
           </DialogPrimitive.Title>
-          <DialogPrimitive.Description className="text-base text-gray-600">
+          <DialogPrimitive.Description className={`text-base text-gray-600 ${sheet ? 'max-w-[300px]' : ''}`}>
             {description}
           </DialogPrimitive.Description>
         </div>
@@ -194,13 +264,30 @@ export default function SignInDialog({
           <p role="alert" className="text-center text-sm text-red-700">{nativeError}</p>
         )}
 
+        {sheet && (
+          <button
+            type="button"
+            onClick={() => setShowEmail((v) => !v)}
+            aria-expanded={showEmail}
+            disabled={busy}
+            className="-mt-1.5 flex w-full items-center justify-center gap-3 rounded-xl border px-4 py-3.5 font-medium transition-all hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 active:translate-y-0 disabled:opacity-50"
+            style={{ color: accent, background: `${accent}14`, borderColor: `${accent}59` }}
+          >
+            <MailIcon />
+            Continue with email
+          </button>
+        )}
+
+        {!sheet && (
         <div className="flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-gray-200" />
           <span className="text-xs font-medium uppercase tracking-wider text-gray-400">or</span>
           <span className="h-px flex-1 bg-gray-200" />
         </div>
+        )}
 
-        {/* Email is deliberately NOT a third button. Google and Apple are one tap
+        {/* Email is deliberately NOT a third button (in the default layout; the
+            sheet, the default since 0.9.3, makes it one: Ash's choice). Google and Apple are one tap
             and are what most people will use; giving email the same visual weight
             implies they are equal choices and makes the dialog read as three
             competing options.
@@ -209,6 +296,8 @@ export default function SignInDialog({
             same size and weight, whether the form is open or closed, and the form
             simply expands beneath it. It previously swapped for the panel's own
             mode-dependent heading, so the text appeared to change on click. */}
+
+        {!sheet && (
         <div className="text-center">
           <button
             type="button"
@@ -220,6 +309,7 @@ export default function SignInDialog({
             Sign in with email
           </button>
         </div>
+        )}
 
         {/* No onCancel: the label above is the toggle, and the provider buttons
             stay visible, so a "back to all options" link would point at something
@@ -236,10 +326,17 @@ export default function SignInDialog({
           <a href="/privacy" className="underline underline-offset-2 hover:text-gray-600">Privacy Policy</a>.
         </p>
 
-          <DialogPrimitive.Close className="absolute right-3 top-3 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">
-            <span aria-hidden="true">×</span>
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
+          {sheet ? (
+            <DialogPrimitive.Close className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">
+              <CloseIcon />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          ) : (
+            <DialogPrimitive.Close className="absolute right-3 top-3 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">
+              <span aria-hidden="true">×</span>
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

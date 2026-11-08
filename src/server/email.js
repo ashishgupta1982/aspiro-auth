@@ -26,7 +26,43 @@ let BRAND = {
   // sentence into the shared file, which CookBook would then have sent to its
   // own users. App-specific copy has to be app-supplied or it leaks.
   verifyNote: '',
+  // The branded layout (0.9.3, the default): a band in the brand colour with
+  // the icon and name, a full-width button and the long link tucked into a
+  // small strip at the foot. `logo` is an absolute icon URL; left out, the icon
+  // is found on the app's own site (findLogo). `colour2` makes the band a
+  // gradient where the mail client supports one; the solid colour shows where
+  // it doesn't (Outlook). `plainEmail: true` keeps the layout from before 0.9.3.
+  logo: '',
+  colour2: '',
+  plainEmail: false,
 };
+
+// The app's icon, for the email band, when the app names none: the first of
+// the usual places on its own site that answers. A mail client cannot fall
+// back from a broken image, so this is checked before sending, once per
+// process, and a miss leaves the band with just the name.
+const LOGO_GUESSES = ['/apple-touch-icon.png', '/icon-192.png'];
+let logoLookup = null;
+
+async function findLogo() {
+  if (BRAND.logo) return BRAND.logo;
+  if (!logoLookup) {
+    logoLookup = (async () => {
+      const base = (appBaseUrl() || '').replace(/\/$/, '');
+      if (!/^https:\/\//.test(base)) return '';
+      for (const path of LOGO_GUESSES) {
+        try {
+          const res = await fetch(base + path, { method: 'HEAD', signal: AbortSignal.timeout(2500) });
+          if (res.ok && (res.headers.get('content-type') || '').startsWith('image/')) return base + path;
+        } catch {
+          // try the next one
+        }
+      }
+      return '';
+    })();
+  }
+  return logoLookup;
+}
 
 export function configureBrand(next) {
   BRAND = { ...BRAND, ...next };
@@ -50,7 +86,54 @@ function replyToAddress() {
   return process.env.EMAIL_REPLY_TO || 'support@aspiro-consulting.co.uk';
 }
 
-function layout({ heading, greeting, body, ctaLabel, ctaUrl, footnote }) {
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return '';
+  }
+}
+
+// The branded layout: a band with the icon and name, the message in a card,
+// and the link in a small strip below the button. Tables and inline styles
+// only, because that is what mail clients render reliably.
+function brandedLayout({ heading, greeting, body, ctaLabel, ctaUrl, footnote, logo }) {
+  const c = BRAND.colour;
+  const band = BRAND.colour2
+    ? `background-color: ${c}; background-image: linear-gradient(135deg, ${c} 0%, ${BRAND.colour2} 100%);`
+    : `background-color: ${c};`;
+  const host = hostOf(BRAND.fallbackUrl);
+  const font = '-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+  return `
+  <div style="font-family: ${font}; max-width: 480px; margin: 0 auto; padding: 16px 12px; color: #1a1a1a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden;">
+      <tr><td bgcolor="${c}" style="${band} padding: 20px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          ${logo ? `<td style="padding-right: 12px;"><img src="${logo}" width="40" height="40" alt="" style="display: block; width: 40px; height: 40px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.7);"></td>` : ''}
+          <td style="font-size: 20px; font-weight: 700; color: #ffffff;">${BRAND.name}</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding: 22px 20px 20px; background: #ffffff;">
+        ${heading ? `<h2 style="font-size: 18px; margin: 0 0 12px;">${heading}</h2>` : ''}
+        <p style="margin: 0; font-size: 17px; font-weight: 600;">${greeting}</p>
+        <p style="margin: 10px 0 0; font-size: 16px; line-height: 24px; color: #374151;">${body}</p>
+        ${ctaUrl ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;"><tr><td bgcolor="${c}" style="border-radius: 12px; text-align: center;">
+          <a href="${ctaUrl}" style="display: block; padding: 15px 0; color: #ffffff; text-decoration: none; font-size: 17px; font-weight: 700;">${ctaLabel}</a>
+        </td></tr></table>` : ''}
+        ${footnote ? `<p style="margin: 18px 0 0; font-size: 14px; line-height: 21px; color: #6b7280;">${footnote}</p>` : ''}
+      </td></tr>
+      ${ctaUrl ? `<tr><td style="padding: 14px 20px 16px; background: #f7f7f5; border-top: 1px solid #eeeeea;">
+        <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6b7280;">Button not working? Copy this link into your browser:</p>
+        <p style="margin: 4px 0 0; font-size: 11px; line-height: 16px; color: #6b7280; word-break: break-all;">${ctaUrl}</p>
+      </td></tr>` : ''}
+    </table>
+    ${host ? `<p style="margin: 16px 0 0; text-align: center; font-size: 12px; line-height: 18px; color: #9ca3af;">${BRAND.name} · ${host}</p>` : ''}
+  </div>`;
+}
+
+function layout(parts) {
+  if (!BRAND.plainEmail) return brandedLayout(parts);
+  const { heading, greeting, body, ctaLabel, ctaUrl, footnote } = parts;
   return `
   <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1a1a1a;">
     <h1 style="font-size: 20px; color: ${BRAND.colour}; margin: 0 0 16px;">${BRAND.name}</h1>
@@ -123,6 +206,7 @@ export async function sendVerificationEmail({ to, name, verifyUrl }) {
     subject: `Verify your ${BRAND.name} email`,
     logLine: `[email] Verification link for ${to}: ${verifyUrl}`,
     html: layout({
+      logo: await findLogo(),
       greeting: name ? `Hi ${name},` : 'Hi,',
       body: verificationBody(),
       ctaLabel: 'Verify my email',
@@ -138,6 +222,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }) {
     subject: `Reset your ${BRAND.name} password`,
     logLine: `[email] Password reset link for ${to}: ${resetUrl}`,
     html: layout({
+      logo: await findLogo(),
       greeting: name ? `Hi ${name},` : 'Hi,',
       body: 'We received a request to set a new password on your account. Click below to choose one.',
       ctaLabel: 'Choose a new password',
@@ -160,6 +245,7 @@ export async function sendAccountExistsEmail({ to, name, hasPassword }) {
     subject: `You already have a ${BRAND.name} account`,
     logLine: `[email] Account-exists notice for ${to}`,
     html: layout({
+      logo: await findLogo(),
       greeting: name ? `Hi ${name},` : 'Hi,',
       body: hasPassword
         ? 'Someone just tried to create an account with this email address, but you already have one. If that was you, sign in instead — or use "Forgot password" if you can\'t remember it.'
