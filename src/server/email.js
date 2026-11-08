@@ -18,6 +18,8 @@
 // each app is its own Node process and calls createAuth() once at import time.
 let BRAND = {
   name: 'App',
+  // Neutral slate for an app that gives no colour: the email band and button
+  // then read as plain, not as some other app's brand.
   colour: '#111827',
   fallbackUrl: '',
   // Optional one-sentence nudge appended to the VERIFICATION email only, saying
@@ -64,8 +66,11 @@ async function findLogo() {
   return logoLookup;
 }
 
+// Only the values an app actually gave: an app that sets no colour keeps the
+// neutral slate above rather than an empty one.
 export function configureBrand(next) {
-  BRAND = { ...BRAND, ...next };
+  const given = Object.fromEntries(Object.entries(next || {}).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+  BRAND = { ...BRAND, ...given };
 }
 
 export function appBaseUrl() {
