@@ -25,8 +25,21 @@ const jwt = jwtModule.default ?? jwtModule;
 // Apple client secrets expire (max 6 months), so generate a fresh one from the
 // Sign in with Apple key (.p8) on each boot rather than pasting a static JWT that
 // would silently break sign-in later. Set the key + IDs once and it self-renews.
+//
+// The key arrives in whatever shape the env var was pasted in: the .p8 as it
+// is, one line with \n written out, wrapped in quotes, or with its line breaks
+// turned to spaces by a single-line box. All of them hold the same base64
+// between the same two markers, so the PEM is rebuilt from that.
+export function applePrivateKey(raw) {
+  const text = String(raw || '').replace(/\\r|\\n/g, '\n');
+  const found = text.match(/-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/);
+  if (!found) return text;
+  const body = found[1].replace(/[^A-Za-z0-9+/=]/g, '');
+  return `-----BEGIN PRIVATE KEY-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
+}
+
 function appleClientSecret() {
-  return jwt.sign({}, process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'), {
+  return jwt.sign({}, applePrivateKey(process.env.APPLE_PRIVATE_KEY), {
     algorithm: 'ES256',
     keyid: process.env.APPLE_KEY_ID,
     issuer: process.env.APPLE_TEAM_ID,
@@ -126,11 +139,24 @@ export function buildAuthOptions(ctx) {
     process.env.APPLE_KEY_ID &&
     process.env.APPLE_PRIVATE_KEY;
 
+  // A key that cannot sign must cost Apple and nothing else. This runs as the
+  // module loads, and every route that reads the session loads this module: an
+  // error thrown here took down all of VocabularyBuilder's sign-in, Teams
+  // included, on 2026-11-12. So it is caught, logged, and Apple stays off.
+  let appleSecret = null;
   if (appleConfigured) {
+    try {
+      appleSecret = appleClientSecret();
+    } catch (error) {
+      console.error('[aspiro-auth] Apple sign-in is OFF: APPLE_PRIVATE_KEY could not sign.', error?.message || error);
+    }
+  }
+
+  if (appleSecret) {
     providers.push(
       AppleProvider({
         clientId: process.env.APPLE_SERVICES_ID,
-        clientSecret: appleClientSecret(),
+        clientSecret: appleSecret,
         allowDangerousEmailAccountLinking: true,
       })
     );
