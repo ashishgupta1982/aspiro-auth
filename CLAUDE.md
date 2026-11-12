@@ -1,7 +1,7 @@
 # @aspiro/auth
 
-Sign-in for the whole suite — Google, Apple and email + password over one
-NextAuth v4 database-session model, plus the credential routes, the sign-in
+Sign-in for the whole suite — Google, Apple, Microsoft and email + password over
+one NextAuth v4 database-session model, plus the credential routes, the sign-in
 dialog and the verify/reset pages. Eleven apps depend on it, which makes this
 the highest-blast-radius repo in the projects root: a mistake here is an
 account-takeover path in eleven products at once.
@@ -22,6 +22,12 @@ anything about the provider set. Don't restate it here or in the README.
 **All three providers ship in every app. There is no capability selection.**
 Apple registers itself only when its four env vars are present and stays dormant
 otherwise — so an app gains Apple by adding env vars, never by changing code.
+
+**Microsoft (0.10.0) is the same shape.** The `azure-ad` provider registers only
+when `AZURE_AD_CLIENT_ID` and `AZURE_AD_CLIENT_SECRET` are present, which today
+is VocabularyBuilder alone, and the dialog shows its button only when the app
+passes `microsoftEnabled`. Before bumping an app that once had Azure env vars
+(RunCoach), check they are gone from Vercel, or Microsoft registers there.
 
 The dangerous parts of auth are the *interactions*, not the capabilities. The
 account-takeover path found in ChessMaster on 2026-08-26 existed because Google
@@ -49,9 +55,9 @@ Read the live pins rather than trusting a list, including one written here:
 grep -h '"@aspiro/auth"' ../*/package.json
 ```
 
-Every app is on the same version today. Keep it that way where you can: this is
-the one package where a security fix that reaches only half the suite is worse
-than useless, because it reads as done.
+The pins are not all the same (the grep says which). Bring them level where you
+can: this is the one package where a security fix that reaches only half the
+suite is worse than useless, because it reads as done.
 
 ## Releasing
 
@@ -104,6 +110,14 @@ peers — that is why GolfSoc can take the gate without taking the dialog.
   — it is load-bearing, not polish.
 - **An OAuth sign-in clears an unverified password** on that account. Users add
   a password through Forgot password, which proves mailbox control first.
+- **A Microsoft sign-in links by email, whatever the capitals**
+  (`linkMicrosoftByEmail` in `server/nextauth.js`), because Microsoft gives
+  addresses as the tenant typed them and an account made by VocabularyBuilder's
+  Teams sign-in has no `accounts` row. It is that app's rule from before it
+  joined, kept as it was. Microsoft does not say an address is verified, so this
+  is weaker than Google's and Apple's linking; the stricter rule (the Azure
+  `oid` + `tid` pair) is in VocabularyBuilder's `TODO.md`. Don't widen it to
+  the other providers.
 - **The app keeps its own `dbConnect`, `User` model, rate limiter and
   `authHelper.js`.** Pulling those in here would make the package need to know
   each app's data layer.
@@ -116,9 +130,11 @@ peers — that is why GolfSoc can take the gate without taking the dialog.
 
 - **GolfSoc** — invite and placeholder-claim flow; the only real behavioural
   fork in the suite.
-- **VocabularyBuilder** — Teams SSO. `@microsoft/teams-js` is 5 MB and used by
-  one app; sharing it would cost every other app that for nothing. It also keeps
-  its own in-component session gate, tangled with Teams and load-bearing.
+- **VocabularyBuilder** — on the package for website sign-in since 0.10.0; its
+  Teams SSO stays its own (`teams-sso.js`, a `teams-session` cookie its
+  `authHelper.js` tries first). `@microsoft/teams-js` is 5 MB and used by one
+  app; sharing it would cost every other app that for nothing. It also keeps its
+  own in-component session gate, tangled with Teams and load-bearing.
 - **RunCoach and ChessMaster have no `src/middleware.js`** — those edge
   redirects were deleted deliberately when the splash gate took over the
   signed-out case in place. Don't reintroduce them.

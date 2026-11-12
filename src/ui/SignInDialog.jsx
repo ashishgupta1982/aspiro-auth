@@ -53,6 +53,15 @@ const AppleIcon = () => (
   </svg>
 );
 
+const MicrosoftIcon = () => (
+  <svg className="h-5 w-5" viewBox="0 0 23 23" aria-hidden="true">
+    <path fill="#F25022" d="M1 1h10v10H1z" />
+    <path fill="#7FBA00" d="M12 1h10v10H12z" />
+    <path fill="#00A4EF" d="M1 12h10v10H1z" />
+    <path fill="#FFB900" d="M12 12h10v10H12z" />
+  </svg>
+);
+
 const CloseIcon = () => (
   <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M18 6 6 18" />
@@ -116,6 +125,7 @@ export default function SignInDialog({
   title = 'Sign in',
   description = 'Choose how you would like to sign in.',
   appleEnabled = false,
+  microsoftEnabled = false,
   isAuthenticating = false,
   accent = '#111827',
   onSignIn,
@@ -236,6 +246,28 @@ export default function SignInDialog({
               </>
             )}
           </button>
+
+          {microsoftEnabled && (
+            <button
+              type="button"
+              onClick={() => start('azure-ad')}
+              disabled={busy}
+              aria-busy={pending === 'azure-ad'}
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3.5 font-medium text-gray-700 shadow-sm ring-1 ring-black/[0.02] transition-all hover:-translate-y-px hover:border-gray-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--auth-accent)] focus-visible:ring-offset-2 active:translate-y-0 active:shadow-sm disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+            >
+              {pending === 'azure-ad' ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-500" strokeWidth={2.25} />
+                  Signing in with Microsoft&hellip;
+                </>
+              ) : (
+                <>
+                  <MicrosoftIcon />
+                  Continue with Microsoft
+                </>
+              )}
+            </button>
+          )}
 
           {appleEnabled && (
             <button

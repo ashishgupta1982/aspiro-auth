@@ -1,5 +1,6 @@
 import GoogleProviderModule from 'next-auth/providers/google';
 import AppleProviderModule from 'next-auth/providers/apple';
+import AzureADProviderModule from 'next-auth/providers/azure-ad';
 import jwtModule from 'jsonwebtoken';
 import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
 
@@ -10,6 +11,7 @@ import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
 // it throws "GoogleProvider is not a function".
 const GoogleProvider = GoogleProviderModule.default ?? GoogleProviderModule;
 const AppleProvider = AppleProviderModule.default ?? AppleProviderModule;
+const AzureADProvider = AzureADProviderModule.default ?? AzureADProviderModule;
 const jwt = jwtModule.default ?? jwtModule;
 
 // The NextAuth options every app shares.
@@ -32,6 +34,64 @@ function appleClientSecret() {
     subject: process.env.APPLE_SERVICES_ID, // the Services ID = web clientId
     expiresIn: '180d',
   });
+}
+
+// Microsoft's linking rule (0.10.0), as VocabularyBuilder ran it before it
+// joined the package: a Microsoft sign-in lands on the existing account with the
+// same email, whatever the capitals.
+//
+// NextAuth's own email linking compares the address exactly. Microsoft gives
+// addresses as the tenant typed them (First.Last@school.org), and an account
+// made by an app's own Teams sign-in has no `accounts` row at all, so an exact
+// match would miss and NextAuth would make a second, empty account. This runs
+// before NextAuth looks the account up: it writes (or refreshes) the `accounts`
+// row on the existing user, so NextAuth then finds that user by the row.
+//
+// Known and accepted for now: Microsoft does not say an address is verified, and
+// with a multi-tenant app registration a tenant's admin chooses the address. The
+// stricter rule (the Azure `oid` + `tid` pair) is in VocabularyBuilder's TODO.md.
+async function linkMicrosoftByEmail({ clientPromise, user, account }) {
+  if (!user?.email) return;
+  const db = (await clientPromise).db();
+  const users = db.collection('users');
+  const accounts = db.collection('accounts');
+
+  const escaped = user.email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const existing = await users.findOne({ email: new RegExp(`^${escaped}$`, 'i') });
+  if (!existing) return; // a new person: NextAuth creates the user and the row
+
+  const tokens = {
+    refresh_token: account.refresh_token,
+    access_token: account.access_token,
+    expires_at: account.expires_at,
+    token_type: account.token_type,
+    scope: account.scope,
+    id_token: account.id_token,
+    session_state: account.session_state,
+  };
+
+  const row =
+    (await accounts.findOne({
+      userId: existing._id,
+      provider: account.provider,
+      providerAccountId: account.providerAccountId,
+    })) || (await accounts.findOne({ userId: existing._id, provider: account.provider }));
+
+  if (row) {
+    await accounts.updateOne(
+      { _id: row._id },
+      { $set: { ...tokens, providerAccountId: account.providerAccountId } }
+    );
+  } else {
+    await accounts.insertOne({
+      userId: existing._id,
+      type: account.type,
+      provider: account.provider,
+      providerAccountId: account.providerAccountId,
+      ...tokens,
+    });
+  }
+  user.id = existing._id.toString();
 }
 
 /**
@@ -76,6 +136,22 @@ export function buildAuthOptions(ctx) {
     );
   }
 
+  // Microsoft is the same shape as Apple: in every app, REGISTERED only where
+  // its two env vars exist, so it is dormant everywhere but VocabularyBuilder.
+  // The id stays `azure-ad`: existing `accounts` rows carry it. Any tenant
+  // (`common`) unless AZURE_AD_TENANT_ID narrows it.
+  if (process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET) {
+    providers.push(
+      AzureADProvider({
+        clientId: process.env.AZURE_AD_CLIENT_ID,
+        clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
+        tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
+        authorization: { params: { scope: 'openid profile email', prompt: 'select_account' } },
+        allowDangerousEmailAccountLinking: true,
+      })
+    );
+  }
+
   // Apple returns its callback as a CROSS-SITE POST (response_mode=form_post from
   // appleid.apple.com). The default SameSite=Lax cookies aren't sent on that request.
   // Without state/PKCE/nonce NextAuth fails with `OAuthCallback`. Without callback-url
@@ -102,7 +178,7 @@ export function buildAuthOptions(ctx) {
     pages: { signIn: '/signin', error: '/signin', ...(pages || {}) },
 
     events: {
-      async signIn({ user }) {
+      async signIn({ user, account, profile }) {
         await dbConnect();
         const update = { lastLoginAt: new Date() };
         if (user?.id && /^[a-f0-9]{24}$/i.test(user.id)) {
@@ -148,12 +224,15 @@ export function buildAuthOptions(ctx) {
         // NOTE: events.signIn fires ONLY for provider sign-ins. Work that must
         // happen on EVERY sign-in has to live in a helper the password,
         // verification and reset routes call too — it will not run here for them.
-        if (onSignIn) await onSignIn({ user });
+        if (onSignIn) await onSignIn({ user, account, profile });
       },
     },
 
     callbacks: {
-      async signIn() {
+      async signIn({ user, account }) {
+        if (account?.provider === 'azure-ad') {
+          await linkMicrosoftByEmail({ clientPromise, user, account });
+        }
         return true;
       },
       redirect: async ({ url, baseUrl }) => {

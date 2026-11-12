@@ -1,7 +1,7 @@
 # @aspiro/auth
 
-Google + Apple + email/password sign-in for the Aspiro app suite. NextAuth v4,
-MongoDB adapter, **database sessions**.
+Google + Apple + Microsoft + email/password sign-in for the Aspiro app suite.
+NextAuth v4, MongoDB adapter, **database sessions**.
 
 Extracted from ChessMaster on 2026-08-26 — the canonical copy at the time, and
 the only one passing all seven checks in the vault's `Indie-Dev/Auth` audit.
@@ -13,6 +13,12 @@ the only one passing all seven checks in the vault's `Indie-Dev/Auth` audit.
 Apple *registers itself* only when `APPLE_SERVICES_ID`, `APPLE_TEAM_ID`,
 `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` are all present, and stays dormant
 otherwise. So an app gets Apple by adding env vars — never by changing code.
+
+**Microsoft (0.10.0) works the same way.** The `azure-ad` provider registers
+only when `AZURE_AD_CLIENT_ID` and `AZURE_AD_CLIENT_SECRET` are present
+(`AZURE_AD_TENANT_ID` is optional; without it any tenant may sign in). A
+Microsoft sign-in lands on the existing account with the same email, whatever
+the capitals. Only VocabularyBuilder sets these today.
 
 Why fixed rather than configurable: the dangerous parts of auth are the
 *interactions*, not the capabilities. The account-takeover path found in
@@ -188,7 +194,8 @@ import { SignInDialog } from '@aspiro/auth/ui';
   title="Sign in to ChessMaster"
   description="Track your games and get AI coaching."
   appleEnabled={process.env.NEXT_PUBLIC_APPLE_ENABLED === 'true'}
-  onSignIn={handleSignIn}
+  microsoftEnabled        // 0.10.0: only in an app with the AZURE_AD_* env vars
+  onSignIn={handleSignIn} // called with 'google', 'apple' or 'azure-ad'
   // Optional (0.9.3):
   layout="dialog"         // the old centred box; the default is "sheet"
   icon="/my-icon.png"     // or false; left out, it finds the app's own icon
@@ -355,11 +362,12 @@ not, and every one of them fails **silently**.
 | Tutor App | Its session callback **provisioned** — created the User doc, backfilled seven fields, auto-created a default student (trap 9). Returns early on `enrichFailed`. Its student claim flow re-points `accounts`/`sessions` directly and is untouched by the migration. |
 | RunCoach | Carried an Azure AD provider no UI ever offered, since deleted. Keeps a throttled `lastLoginAt` refresh in `onSession`, because `events.signIn` never fires for a returning user with a live session. |
 | DoIt | Nothing — the cleanest of the six. |
+| VocabularyBuilder | Website sign-in only, with Microsoft; Teams SSO stays in the app. It took the package's standard session cookie, so website users signed in again once. Its `onSession` provisions (default word lists, school by email domain; trap 9). Classic's `SignInModal` mounts the dialog outside Teams. No `/signin` page: `pages: { signIn: '/', error: '/' }`. `onSignIn` now also receives `account` and `profile`. |
 | MoneyHub | Trap 11. Keeps `serverSelectionTimeoutMS: 8000` in its own Mongo config, where it belongs. |
 
 Out of scope: **GolfSoc** (uses `CredentialsProvider` and a placeholder-claim
-flow this package deliberately doesn't cover), **VocabularyBuilder** (stays
-forked for its Teams build), **GamePad** (deferred), **Aspiro Homepage** (auth
+flow this package deliberately doesn't cover), **VocabularyBuilder's Teams SSO**
+(the website is on the package; Teams stays the app's own), **GamePad** (deferred), **Aspiro Homepage** (auth
 deleted outright — it was a static brochure site carrying NextAuth, Mongo and a
 Teams SSO endpoint for a settings page that showed you your own email address).
 
@@ -375,8 +383,10 @@ Not everything belongs here. Each app keeps its own:
 ## Not covered
 
 - **GolfSoc** — invite/placeholder-claim flow; the only real behavioural fork.
-- **VocabularyBuilder** — Teams SSO. `@microsoft/teams-js` is 5 MB and used by
+- **VocabularyBuilder's Teams SSO** — `@microsoft/teams-js` is 5 MB and used by
   one app; a shared dependency would cost every other app that for nothing.
+- **Microsoft inside an iOS shell** — `native/start` admits only Google and
+  Apple so far.
 
 ## Related
 
