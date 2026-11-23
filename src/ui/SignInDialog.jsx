@@ -167,6 +167,20 @@ export default function SignInDialog({
     }
   }, [open]);
 
+  // Safari (and other browsers) can bring the page back from the back/forward
+  // cache exactly as it was left: dialog open, button spinning. That happens
+  // when a sign-in hands off to the provider and the person ends up back here,
+  // most often on a first Apple sign-in on an iPhone, where the extra consent
+  // screens make the return slow. Nothing is in flight any more, so drop the
+  // spinner and let them tap again.
+  useEffect(() => {
+    const restored = (event) => {
+      if (event.persisted) setPending(null);
+    };
+    window.addEventListener('pageshow', restored);
+    return () => window.removeEventListener('pageshow', restored);
+  }, []);
+
   // Warm the auth endpoint the moment the dialog opens.
   //
   // This is the first of the two round trips above, fetched before the user has
