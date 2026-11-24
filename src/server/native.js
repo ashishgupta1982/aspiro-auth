@@ -147,6 +147,14 @@ export function createNativeRedeemHandler({ clientPromise, checkRate, getClientI
       res.setHeader('Allow', ['POST']);
       return res.status(405).json({ error: 'Method not allowed' });
     }
+    // JSON only. A form posted from another website can send a urlencoded or
+    // plain-text body but never application/json (that needs a CORS preflight,
+    // which another origin fails), so this refuses a page that would sign the
+    // visitor's browser into its own account with a code it redeemed for itself.
+    // nativeSignIn sends JSON. Found in the 2026-11-23 sweep.
+    if (!String(req.headers?.['content-type'] || '').toLowerCase().startsWith('application/json')) {
+      return res.status(415).json({ error: 'Sign-in could not be completed. Please try again.' });
+    }
     if (!checkRate(getClientIP(req), 'AUTH_API').allowed) {
       return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
     }

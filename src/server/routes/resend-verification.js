@@ -1,5 +1,6 @@
 import { generateVerificationToken } from '../verificationToken.js';
 import { sendVerificationEmail, appBaseUrl } from '../email.js';
+import { allowEmailTo } from '../emailLimit.js';
 
 // Re-issues a verification link. Enumeration-safe: the response never reveals
 // whether the address exists or is already verified.
@@ -31,7 +32,7 @@ export function createResendVerificationHandler(ctx) {
 
       // Only re-send for an unverified account that actually has a password.
       // A Google/Apple-only account has nothing to verify.
-      if (user && !user.emailVerified && user.password) {
+      if (user && !user.emailVerified && user.password && (await allowEmailTo(clientPromise, emailLower))) {
         const token = generateVerificationToken();
         user.emailVerificationToken = token.hash;
         user.emailVerificationExpires = token.expires;

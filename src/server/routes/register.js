@@ -1,6 +1,7 @@
 import { hashPassword, validatePassword } from '../password.js';
 import { generateVerificationToken } from '../verificationToken.js';
 import { sendVerificationEmail, sendAccountExistsEmail, appBaseUrl } from '../email.js';
+import { allowEmailTo } from '../emailLimit.js';
 
 // First-party sign-up. Google and Apple sign-in are unaffected — they still go
 // through NextAuth.
@@ -61,7 +62,7 @@ export function createRegisterHandler(ctx) {
 
       if (existing) {
         // Same response as the success path. Tell the actual owner by email.
-        await sendAccountExistsEmail({
+        if (await allowEmailTo(clientPromise, emailLower)) await sendAccountExistsEmail({
           to: emailLower,
           name: existing.name,
           hasPassword: Boolean(existing.password),
@@ -79,7 +80,7 @@ export function createRegisterHandler(ctx) {
         emailVerificationExpires: token.expires,
       });
 
-      await sendVerificationEmail({
+      if (await allowEmailTo(clientPromise, emailLower)) await sendVerificationEmail({
         to: emailLower,
         name: cleanName,
         verifyUrl: `${appBaseUrl()}/verify-email?token=${token.raw}`,

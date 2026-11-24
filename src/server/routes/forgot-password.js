@@ -1,5 +1,6 @@
 import { generatePasswordResetToken } from '../verificationToken.js';
 import { sendPasswordResetEmail, appBaseUrl } from '../email.js';
+import { allowEmailTo } from '../emailLimit.js';
 
 // Starts a password reset. Enumeration-safe — the response is identical whether
 // or not the address has an account.
@@ -33,7 +34,7 @@ export function createForgotPasswordHandler(ctx) {
       const emailLower = String(email).toLowerCase().trim();
       const user = await User.findOne({ email: emailLower }).select('name');
 
-      if (user) {
+      if (user && (await allowEmailTo(clientPromise, emailLower))) {
         const token = generatePasswordResetToken();
         user.passwordResetToken = token.hash;
         user.passwordResetExpires = token.expires;

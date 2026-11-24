@@ -85,6 +85,7 @@ src/
 │   ├── password.js          hashing + verification
 │   ├── verificationToken.js single-use tokens
 │   ├── email.js             Resend delivery
+│   ├── emailLimit.js        at most 5 emails an hour to one address (Mongo, hashed)
 │   ├── native.js            the iOS shell's sign-in hand-over (start, finish, redeem)
 │   └── routes/              the six credential routes
 └── ui/                      SignInDialog, the two landing pages, the splash gate,

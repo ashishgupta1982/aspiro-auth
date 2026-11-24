@@ -219,6 +219,16 @@ async function safeSend({ to, subject, parts, logLine }) {
   }
 }
 
+// A person's name is whatever they typed at sign-up, and anyone can sign up with
+// someone else's address, so it goes into the HTML as text. Unescaped, a "name"
+// holding a link would arrive in that person's inbox inside a genuine email from
+// us. Found in the 2026-11-23 sweep.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+const greet = (name) => (name ? `Hi ${escapeHtml(name)},` : 'Hi,');
+
 // The generic sentence, plus whatever this app wants to say about what happens
 // next. Keep the app's half in its BRAND, never here.
 function verificationBody() {
@@ -233,7 +243,7 @@ export async function sendVerificationEmail({ to, name, verifyUrl }) {
     logLine: `[email] Verification link for ${to}: ${verifyUrl}`,
     parts: {
       heading: 'Verify your email',
-      greeting: name ? `Hi ${name},` : 'Hi,',
+      greeting: greet(name),
       body: verificationBody(),
       ctaLabel: 'Verify my email',
       ctaUrl: verifyUrl,
@@ -249,7 +259,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }) {
     logLine: `[email] Password reset link for ${to}: ${resetUrl}`,
     parts: {
       heading: 'Reset your password',
-      greeting: name ? `Hi ${name},` : 'Hi,',
+      greeting: greet(name),
       body: 'We received a request to set a new password on your account. Click below to choose one.',
       ctaLabel: 'Choose a new password',
       ctaUrl: resetUrl,
@@ -272,7 +282,7 @@ export async function sendAccountExistsEmail({ to, name, hasPassword }) {
     logLine: `[email] Account-exists notice for ${to}`,
     parts: {
       heading: 'You already have an account',
-      greeting: name ? `Hi ${name},` : 'Hi,',
+      greeting: greet(name),
       body: hasPassword
         ? 'Someone just tried to create an account with this email address, but you already have one. If that was you, sign in instead — or use "Forgot password" if you can\'t remember it.'
         : 'Someone just tried to create an account with this email address. You already have an account that signs in with Google or Apple. If that was you, sign in with the button you used originally — or use "Forgot password" to add a password to your account.',
